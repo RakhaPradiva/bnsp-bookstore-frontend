@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { getCarts, deleteCart } from "../../services/carts";
-import { createTransaction } from "../../services/transactions";
-import { createPayment } from "../../services/payment";
-import { IMAGE_STORAGE } from "../../api";
-import { rupiah } from "../../utils";
 import { AiFillCheckCircle } from "react-icons/ai";
+import { IMAGE_STORAGE } from "../../api";
+import { getCarts, deleteCart } from "../../services/carts";
+import { createPayment } from "../../services/payment";
+import { createTransaction } from "../../services/transactions";
+import { rupiah } from "../../utils";
 
 const PAYMENT_METHODS = [
   { value: "bank_transfer", label: "Transfer Bank", requiresProof: true },
@@ -17,6 +17,246 @@ const PAYMENT_METHODS = [
 const getMethod = (value) =>
   PAYMENT_METHODS.find((method) => method.value === value) ??
   PAYMENT_METHODS[0];
+
+const getBook = (item) => item.book ?? {};
+
+const getPrice = (item) => getBook(item).price ?? item.price ?? 0;
+
+const getTitle = (item) =>
+  getBook(item).title ?? item.book_title ?? item.title ?? "-";
+
+const getErrorMessage = (error) => {
+  const response = error.response?.data;
+  const fieldErrors = response?.data ? Object.values(response.data).flat() : [];
+
+  return (
+    fieldErrors[0] ??
+    response?.message ??
+    error.message ??
+    "Gagal membuat pesanan."
+  );
+};
+
+const validateOrder = (items, formData, requiresProof) => {
+  if (items.length === 0) {
+    return "Keranjang kosong. Tambahkan buku terlebih dahulu.";
+  }
+  if (!formData.shipping_address.trim()) {
+    return "Alamat pengiriman wajib diisi.";
+  }
+  if (requiresProof && !formData.payment_proof) {
+    return "Bukti pembayaran wajib diunggah untuk metode ini.";
+  }
+  return null;
+};
+
+const MessageState = ({ title, description, action }) => (
+  <section className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <div className="flex flex-col items-center gap-3 py-16 text-center">
+      <p className="text-lg font-semibold">{title}</p>
+      <p className="text-base-content/60">{description}</p>
+      {action}
+    </div>
+  </section>
+);
+
+const ShippingCard = ({ recipientName, formData, onChange }) => (
+  <div className="card bg-base-200">
+    <div className="card-body gap-4 p-4 sm:p-6">
+      <h2 className="card-title text-lg">Data Pengiriman</h2>
+
+      <fieldset className="fieldset">
+        <legend className="fieldset-legend">Nama Penerima</legend>
+        <input
+          type="text"
+          className="input w-full"
+          value={recipientName}
+          readOnly
+        />
+      </fieldset>
+
+      <fieldset className="fieldset">
+        <legend className="fieldset-legend">Alamat Pengiriman</legend>
+        <textarea
+          name="shipping_address"
+          className="textarea w-full"
+          rows={3}
+          placeholder="Nama jalan, nomor rumah, kota, kode pos"
+          value={formData.shipping_address}
+          onChange={onChange}
+        />
+      </fieldset>
+
+      <fieldset className="fieldset">
+        <legend className="fieldset-legend">Catatan (opsional)</legend>
+        <textarea
+          name="notes"
+          className="textarea w-full"
+          rows={2}
+          placeholder="Catatan untuk pesanan"
+          value={formData.notes}
+          onChange={onChange}
+        />
+      </fieldset>
+    </div>
+  </div>
+);
+
+const PaymentCard = ({ formData, requiresProof, onChange }) => (
+  <div className="card bg-base-200">
+    <div className="card-body gap-4 p-4 sm:p-6">
+      <h2 className="card-title text-lg">Metode Pembayaran</h2>
+
+      <fieldset className="fieldset">
+        <legend className="fieldset-legend">Pilih metode</legend>
+        <select
+          name="payment_method"
+          className="select w-full"
+          value={formData.payment_method}
+          onChange={onChange}
+        >
+          {PAYMENT_METHODS.map((method) => (
+            <option key={method.value} value={method.value}>
+              {method.label}
+            </option>
+          ))}
+        </select>
+      </fieldset>
+
+      {requiresProof ? (
+        <fieldset className="fieldset">
+          <legend className="fieldset-legend">Bukti Pembayaran</legend>
+          <input
+            type="file"
+            name="payment_proof"
+            accept="image/*"
+            className="file-input w-full"
+            onChange={onChange}
+            required
+          />
+          <p className="label">Unggah gambar bukti transfer (JPG/PNG).</p>
+        </fieldset>
+      ) : (
+        <div className="alert alert-info alert-soft">
+          <span>
+            Pembayaran dilakukan saat buku diterima. Tidak perlu mengunggah
+            bukti pembayaran.
+          </span>
+        </div>
+      )}
+    </div>
+  </div>
+);
+
+const OrderSummary = ({
+  items,
+  method,
+  totalItems,
+  totalPrice,
+  submitting,
+}) => (
+  <aside className="lg:col-span-1">
+    <div className="card sticky top-6 bg-base-200">
+      <div className="card-body gap-4 p-4 sm:p-6">
+        <h2 className="card-title text-lg">Ringkasan Pesanan</h2>
+
+        <ul className="flex max-h-72 flex-col divide-y divide-base-300 overflow-y-auto">
+          {items.map((item) => {
+            const book = getBook(item);
+            const title = getTitle(item);
+
+            return (
+              <li
+                key={item.id ?? book.id}
+                className="flex items-start gap-3 py-3"
+              >
+                <img
+                  src={`${IMAGE_STORAGE}/books/${book.cover_photo}`}
+                  alt={`cover ${title}`}
+                  className="h-20 w-14 shrink-0 rounded-box bg-base-300 object-cover"
+                  loading="lazy"
+                />
+                <div className="flex min-w-0 grow flex-col gap-1">
+                  <p className="line-clamp-2 text-sm font-medium" title={title}>
+                    {title}
+                  </p>
+                  <p className="text-xs text-base-content/60">
+                    Jumlah: {item.quantity}
+                  </p>
+                  <p className="text-sm font-semibold">
+                    {rupiah(getPrice(item) * (item.quantity ?? 0))}
+                  </p>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+
+        <div className="divider my-0" />
+
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-base-content/60">Jumlah buku</span>
+          <span>{totalItems}</span>
+        </div>
+
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-base-content/60">Metode pembayaran</span>
+          <span>{method.label}</span>
+        </div>
+
+        <div className="flex items-center justify-between text-base font-semibold">
+          <span>Total</span>
+          <span className="text-primary">{rupiah(totalPrice)}</span>
+        </div>
+
+        <button
+          type="submit"
+          className="btn btn-primary btn-block"
+          disabled={submitting}
+        >
+          {submitting ? (
+            <span
+              className="loading loading-spinner loading-sm"
+              aria-label="Memproses"
+            />
+          ) : (
+            "Buat Pesanan"
+          )}
+        </button>
+      </div>
+    </div>
+  </aside>
+);
+
+const SuccessDialog = ({ open, onClose }) => (
+  <dialog className={`modal ${open ? "modal-open" : ""}`} onClose={onClose}>
+    <div className="modal-box">
+      <div className="flex flex-col items-center gap-4 text-center">
+        <div className="flex size-16 items-center justify-center rounded-full bg-success/20 text-success">
+          <AiFillCheckCircle className="w-8 h-8" />
+        </div>
+        <h2 className="text-lg font-bold">Pesanan Sedang Diproses</h2>
+        <p className="text-base-content/60">
+          Terima kasih! Pesanan Anda sudah kami terima dan saat ini sedang
+          diproses. Anda dapat memantau statusnya di halaman transaksi.
+        </p>
+      </div>
+
+      <div className="modal-action">
+        <Link to="/transaction-history" className="btn btn-secondary">
+          Lihat Transaksi
+        </Link>
+        <button type="button" className="btn btn-primary" onClick={onClose}>
+          Mengerti
+        </button>
+      </div>
+    </div>
+
+    <form method="dialog" className="modal-backdrop">
+      <button>Tutup</button>
+    </form>
+  </dialog>
+);
 
 const Checkout = () => {
   const navigate = useNavigate();
@@ -41,87 +281,78 @@ const Checkout = () => {
   const requiresProof = selectedMethod.requiresProof;
 
   useEffect(() => {
-    let active = true;
-
     if (!token || !userInfo) {
-      return navigate("/");
-    } else if (userInfo.role === "admin") {
+      navigate("/");
+      return;
+    }
+    if (userInfo.role === "admin") {
       navigate("/admin");
+      return;
     }
 
-    const fetchData = async () => {
+    let active = true;
+
+    const loadCart = async () => {
       try {
         const data = await getCarts();
-        if (active) setItems(Array.isArray(data) ? data : (data?.data ?? []));
-      } catch (error) {
-        console.log(error);
+        if (active) {
+          setItems(Array.isArray(data) ? data : (data?.data ?? []));
+        }
+      } catch {
         if (active) setError("Gagal memuat keranjang.");
       } finally {
         if (active) setLoading(false);
       }
     };
 
-    fetchData();
+    loadCart();
+
     return () => {
       active = false;
     };
   }, [token, navigate, userInfo]);
 
-  const getBook = (item) => item.book ?? {};
-  const getPrice = (item) => getBook(item).price ?? item.price ?? 0;
   const totalItems = items.reduce((sum, item) => sum + (item.quantity ?? 0), 0);
   const totalPrice = items.reduce(
     (sum, item) => sum + getPrice(item) * (item.quantity ?? 0),
     0,
   );
 
-  const handleChange = (e) => {
-    const { name, value, files } = e.target;
+  const handleChange = (event) => {
+    const { name, value, files } = event.target;
+    const newValue = name === "payment_proof" ? files[0] : value;
 
-    if (name === "payment_proof") {
-      setFormData({
-        ...formData,
-        payment_proof: files[0],
-      });
-    } else {
-      setFormData({
-        ...formData,
-        [name]: value,
-      });
-    }
+    setFormData((current) => ({ ...current, [name]: newValue }));
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
     setError(null);
 
     if (!token) {
-      return navigate("/login");
+      navigate("/login");
+      return;
     }
-    if (items.length === 0 && !success) {
-      return setError("Keranjang kosong. Tambahkan buku terlebih dahulu.");
-    }
-    if (!formData.shipping_address.trim()) {
-      return setError("Alamat pengiriman wajib diisi.");
-    }
-    if (requiresProof && !formData.payment_proof) {
-      return setError("Bukti pembayaran wajib diunggah untuk metode ini.");
+
+    const validationError = validateOrder(items, formData, requiresProof);
+    if (validationError) {
+      setError(validationError);
+      return;
     }
 
     setSubmitting(true);
+
     try {
-      const transactionData = {
+      const transactionResult = await createTransaction({
         shipping_address: formData.shipping_address,
         notes: formData.notes,
         items: items.map((item) => ({
           book_id: getBook(item).id ?? item.book_id,
           quantity: item.quantity,
         })),
-      };
+      });
 
-      const transactionResult = await createTransaction(transactionData);
       const transactionId = transactionResult?.data?.id;
-
       if (!transactionId) {
         throw new Error("Gagal mendapatkan ID transaksi.");
       }
@@ -133,19 +364,10 @@ const Checkout = () => {
       });
 
       await Promise.all(items.map((item) => deleteCart(item.id)));
-
       window.dispatchEvent(new Event("cart-updated"));
-
       setSuccess(true);
     } catch (error) {
-      const data = error.response?.data;
-      const fieldErrors = data?.data ? Object.values(data.data).flat() : [];
-      setError(
-        fieldErrors[0] ??
-          data?.message ??
-          error.message ??
-          "Gagal membuat pesanan.",
-      );
+      setError(getErrorMessage(error));
     } finally {
       setSubmitting(false);
     }
@@ -169,33 +391,29 @@ const Checkout = () => {
 
   if (!token) {
     return (
-      <section className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="flex flex-col items-center gap-3 py-16 text-center">
-          <p className="text-lg font-semibold">Login terlebih dahulu</p>
-          <p className="text-base-content/60">
-            Anda perlu masuk untuk melanjutkan checkout.
-          </p>
+      <MessageState
+        title="Login terlebih dahulu"
+        description="Anda perlu masuk untuk melanjutkan checkout."
+        action={
           <Link to="/login" className="btn btn-primary">
             Login
           </Link>
-        </div>
-      </section>
+        }
+      />
     );
   }
 
   if (items.length === 0) {
     return (
-      <section className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="flex flex-col items-center gap-3 py-16 text-center">
-          <p className="text-lg font-semibold">Keranjang kosong</p>
-          <p className="text-base-content/60">
-            Tambahkan buku ke keranjang sebelum checkout.
-          </p>
+      <MessageState
+        title="Keranjang kosong"
+        description="Tambahkan buku ke keranjang sebelum checkout."
+        action={
           <Link to="/books" className="btn btn-primary">
             Lihat Daftar Buku
           </Link>
-        </div>
-      </section>
+        }
+      />
     );
   }
 
@@ -219,191 +437,28 @@ const Checkout = () => {
         className="grid grid-cols-1 gap-6 lg:grid-cols-3"
       >
         <div className="flex flex-col gap-6 lg:col-span-2">
-          <div className="card bg-base-200">
-            <div className="card-body gap-4 p-4 sm:p-6">
-              <h2 className="card-title text-lg">Data Pengiriman</h2>
-              <fieldset className="fieldset">
-                <legend className="fieldset-legend">Nama Penerima</legend>
-                <input
-                  type="text"
-                  className="input w-full"
-                  value={userInfo?.name ?? ""}
-                  readOnly
-                />
-              </fieldset>
-              <fieldset className="fieldset">
-                <legend className="fieldset-legend">Alamat Pengiriman</legend>
-                <textarea
-                  name="shipping_address"
-                  className="textarea w-full"
-                  rows={3}
-                  placeholder="Nama jalan, nomor rumah, kota, kode pos"
-                  value={formData.shipping_address}
-                  onChange={handleChange}
-                />
-              </fieldset>
-              <fieldset className="fieldset">
-                <legend className="fieldset-legend">Catatan (opsional)</legend>
-                <textarea
-                  name="notes"
-                  className="textarea w-full"
-                  rows={2}
-                  placeholder="Catatan untuk pesanan"
-                  value={formData.notes}
-                  onChange={handleChange}
-                />
-              </fieldset>
-            </div>
-          </div>
-
-          <div className="card bg-base-200">
-            <div className="card-body gap-4 p-4 sm:p-6">
-              <h2 className="card-title text-lg">Metode Pembayaran</h2>
-              <fieldset className="fieldset">
-                <legend className="fieldset-legend">Pilih metode</legend>
-                <select
-                  name="payment_method"
-                  className="select w-full"
-                  value={formData.payment_method}
-                  onChange={handleChange}
-                >
-                  {PAYMENT_METHODS.map((method) => (
-                    <option key={method.value} value={method.value}>
-                      {method.label}
-                    </option>
-                  ))}
-                </select>
-              </fieldset>
-
-              {requiresProof ? (
-                <fieldset className="fieldset">
-                  <legend className="fieldset-legend">Bukti Pembayaran</legend>
-                  <input
-                    type="file"
-                    name="payment_proof"
-                    accept="image/*"
-                    className="file-input w-full"
-                    onChange={handleChange}
-                    required
-                  />
-                  <p className="label">
-                    Unggah gambar bukti transfer (JPG/PNG).
-                  </p>
-                </fieldset>
-              ) : (
-                <div className="alert alert-info alert-soft">
-                  <span>
-                    Pembayaran dilakukan saat buku diterima. Tidak perlu
-                    mengunggah bukti pembayaran.
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
+          <ShippingCard
+            recipientName={userInfo?.name ?? ""}
+            formData={formData}
+            onChange={handleChange}
+          />
+          <PaymentCard
+            formData={formData}
+            requiresProof={requiresProof}
+            onChange={handleChange}
+          />
         </div>
 
-        <aside className="lg:col-span-1">
-          <div className="card sticky top-6 bg-base-200">
-            <div className="card-body gap-4 p-4 sm:p-6">
-              <h2 className="card-title text-lg">Ringkasan Pesanan</h2>
-              <ul className="flex max-h-72 flex-col divide-y divide-base-300 overflow-y-auto">
-                {items.map((item) => {
-                  const book = getBook(item);
-                  const title =
-                    book.title ?? item.book_title ?? item.title ?? "-";
-                  return (
-                    <li
-                      key={item.id ?? book.id}
-                      className="flex items-start gap-3 py-3"
-                    >
-                      <img
-                        src={`${IMAGE_STORAGE}/books/${book.cover_photo}`}
-                        alt={`cover ${title}`}
-                        className="h-20 w-14 shrink-0 rounded-box bg-base-300 object-cover"
-                        loading="lazy"
-                      />
-                      <div className="flex min-w-0 grow flex-col gap-1">
-                        <p
-                          className="line-clamp-2 text-sm font-medium"
-                          title={title}
-                        >
-                          {title}
-                        </p>
-                        <p className="text-xs text-base-content/60">
-                          Jumlah: {item.quantity}
-                        </p>
-                        <p className="text-sm font-semibold">
-                          {rupiah(getPrice(item) * (item.quantity ?? 0))}
-                        </p>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-              <div className="divider my-0"></div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-base-content/60">Jumlah buku</span>
-                <span>{totalItems}</span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-base-content/60">Metode pembayaran</span>
-                <span>{selectedMethod.label}</span>
-              </div>
-              <div className="flex items-center justify-between text-base font-semibold">
-                <span>Total</span>
-                <span className="text-primary">{rupiah(totalPrice)}</span>
-              </div>
-              <button
-                type="submit"
-                className="btn btn-primary btn-block"
-                disabled={submitting}
-              >
-                {submitting ? (
-                  <span
-                    className="loading loading-spinner loading-sm"
-                    aria-label="Memproses"
-                  />
-                ) : (
-                  "Buat Pesanan"
-                )}
-              </button>
-            </div>
-          </div>
-        </aside>
+        <OrderSummary
+          items={items}
+          method={selectedMethod}
+          totalItems={totalItems}
+          totalPrice={totalPrice}
+          submitting={submitting}
+        />
       </form>
 
-      <dialog
-        className={`modal ${success ? "modal-open" : ""}`}
-        onClose={handleSuccessClose}
-      >
-        <div className="modal-box">
-          <div className="flex flex-col items-center gap-4 text-center">
-            <div className="flex size-16 items-center justify-center rounded-full bg-success/20 text-success">
-              <AiFillCheckCircle className="w-8 h-8" />
-            </div>
-            <h2 className="text-lg font-bold">Pesanan Sedang Diproses</h2>
-            <p className="text-base-content/60">
-              Terima kasih! Pesanan Anda sudah kami terima dan saat ini sedang
-              diproses. Anda dapat memantau statusnya di halaman transaksi.
-            </p>
-          </div>
-          <div className="modal-action">
-            <Link to="/transaction-history" className="btn btn-secondary">
-              Lihat Transaksi
-            </Link>
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={handleSuccessClose}
-            >
-              Mengerti
-            </button>
-          </div>
-        </div>
-        <form method="dialog" className="modal-backdrop">
-          <button>Tutup</button>
-        </form>
-      </dialog>
+      <SuccessDialog open={success} onClose={handleSuccessClose} />
     </section>
   );
 };

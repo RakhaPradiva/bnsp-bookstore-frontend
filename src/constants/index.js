@@ -60,7 +60,7 @@ export const testimonials = [
     location: "Jakarta",
     rating: 5,
     quote:
-      "Filosofi Teras yang saya pesan datang dalam dua hari dan kondisinya mulus. Packing rapi, jadi sudut buku tetap aman meski dikirim jauh.",
+      "Filosofi Teras yang saya pesan sudah sampai dalam dua hari, kondisinya mulus. Packingnya rapi, jadi sudut buku tetap aman walau dikirim jauh.",
   },
   {
     id: 2,
@@ -68,7 +68,7 @@ export const testimonials = [
     location: "Bandung",
     rating: 5,
     quote:
-      "Pilihan bukunya lengkap dan deskripsinya jelas. Saya bisa menemukan edisi yang sudah lama dicari tanpa harus keliling toko.",
+      "Pilihan bukunya lengkap, deskripsinya juga jelas. Saya bisa menemukan edisi yang sudah lama saya cari tanpa harus keliling toko.",
   },
   {
     id: 3,
@@ -76,7 +76,7 @@ export const testimonials = [
     location: "Surabaya",
     rating: 4,
     quote:
-      "Proses checkout cepat dan status pesanan mudah dipantau. Pengirimannya sedikit lebih lama dari perkiraan, tapi bukunya sampai dengan baik.",
+      "Checkout-nya cepat dan status pesanan gampang dipantau. Pengirimannya memang sedikit lebih lama dari perkiraan, tapi bukunya sampai dengan baik.",
   },
   {
     id: 4,
@@ -84,7 +84,7 @@ export const testimonials = [
     location: "Yogyakarta",
     rating: 5,
     quote:
-      "Suka banget sama rekomendasi bukunya. Banyak judul menarik yang belum saya kenal, dan semuanya tersedia dengan harga wajar.",
+      "Suka banget sama rekomendasi bukunya. Banyak judul menarik yang belum pernah saya dengar, dan harganya masih wajar.",
   },
   {
     id: 5,
@@ -92,6 +92,6 @@ export const testimonials = [
     location: "Makassar",
     rating: 5,
     quote:
-      "Baru pertama kali belanja di sini dan langsung puas. Buku original, direspons cepat, dan pengiriman ke luar Jawa tetap aman.",
+      "Baru pertama kali belanja di sini dan langsung puas. Bukunya original, responsnya cepat, dan pengiriman ke luar Jawa tetap aman.",
   },
 ];

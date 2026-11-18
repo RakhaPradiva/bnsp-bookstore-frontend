@@ -2,9 +2,9 @@ import { Link } from "react-router-dom";
 import { MdArrowForward, MdCheckCircle } from "react-icons/md";
 
 const benefits = [
-  "Koleksi buku original pilihan",
-  "Pesanan diproses cepat",
-  "Riwayat transaksi tersimpan rapi",
+  "Koleksi buku original",
+  "Bayar lewat transfer, e-wallet, kartu kredit, atau COD",
+  "Status kiriman bisa dipantau",
 ];
 
 const CTA = () => {
@@ -16,26 +16,22 @@ const CTA = () => {
       <div className="mx-auto max-w-6xl">
         <div className="card rounded-box bg-primary text-primary-content">
           <div className="card-body items-center gap-6 px-6 py-10 text-center sm:px-10 sm:py-14 lg:px-16">
-            <span className="badge badge-outline badge-sm border-primary-content/40">
-              Gabung Sekarang
-            </span>
-
             <div className="max-w-2xl">
               <h2
                 id="cta-title"
                 className="text-2xl font-bold tracking-tight sm:text-3xl lg:text-4xl"
               >
-                Mulai perjalanan membaca Anda bersama Bookstore
+                Daftar akun, semua pesanan buku Anda tercatat
               </h2>
               <p className="mt-3 text-sm leading-relaxed text-primary-content/80 sm:text-base">
-                Buat akun gratis untuk menyimpan buku favorit, memantau pesanan,
-                dan mendapat rekomendasi bacaan yang sesuai dengan minat Anda.
+                Gratis. Keranjang belanja tersimpan di akun, dan transaksi lama
+                bisa Anda buka lagi kapan saja.
               </p>
             </div>
 
             <ul
               role="list"
-              className="flex flex-col items-center gap-2 text-sm text-primary-content/90 sm:flex-row sm:gap-6"
+              className="flex flex-col items-center gap-2 text-sm text-primary-content/90 sm:flex-row sm:flex-wrap sm:justify-center sm:gap-x-6 sm:gap-y-2"
             >
               {benefits.map((benefit) => (
                 <li key={benefit} className="flex items-center gap-1.5">

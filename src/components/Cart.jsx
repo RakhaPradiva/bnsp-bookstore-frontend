@@ -6,22 +6,69 @@ import CartItem from "./CartItem";
 import { MdOutlineShoppingCart } from "react-icons/md";
 import { IoMdClose } from "react-icons/io";
 
+const getBookId = (item) => item.book?.id ?? item.book_id ?? item.id;
+const getItemPrice = (item) => item.book?.price ?? item.price ?? 0;
+
+const countItems = (items) =>
+  items.reduce((total, item) => total + (item.quantity ?? 0), 0);
+
+const calculateTotalPrice = (items) =>
+  items.reduce(
+    (total, item) => total + getItemPrice(item) * (item.quantity ?? 0),
+    0,
+  );
+
+const CartSkeleton = () => (
+  <ul className="flex flex-col gap-2">
+    {[0, 1, 2].map((index) => (
+      <li key={index} className="flex items-start gap-3 py-3">
+        <div className="skeleton h-24 w-16 shrink-0" />
+        <div className="flex grow flex-col gap-2">
+          <div className="skeleton h-4 w-3/4" />
+          <div className="skeleton h-3 w-1/2" />
+          <div className="skeleton h-4 w-1/3" />
+        </div>
+      </li>
+    ))}
+  </ul>
+);
+
+const LoginPrompt = () => (
+  <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
+    <p className="text-sm text-base-content/60">
+      Login untuk melihat buku yang telah ditambahkan.
+    </p>
+    <Link to="/login" className="btn btn-primary btn-sm">
+      Login
+    </Link>
+  </div>
+);
+
+const EmptyCart = () => (
+  <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
+    <MdOutlineShoppingCart className="h-10 w-10" />
+    <p className="text-sm text-base-content/60">Belum ada buku di keranjang.</p>
+    <label htmlFor="cart-drawer" className="btn btn-primary btn-sm">
+      Tutup
+    </label>
+    <Link to="/books" className="btn btn-ghost btn-sm">
+      Jelajahi Buku
+    </Link>
+  </div>
+);
+
 const Cart = ({ token = null }) => {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [pendingId, setPendingId] = useState(null);
 
-  const resolveBookId = (item) => item.book?.id ?? item.book_id ?? item.id;
-  const resolveItemPrice = (item) => item.book?.price ?? item.price ?? 0;
-
   useEffect(() => {
+    if (!token) return;
+
     let active = true;
+
     const loadCarts = async () => {
-      if (!token) {
-        if (active) setItems([]);
-        return;
-      }
       setLoading(true);
       setError(null);
       try {
@@ -44,13 +91,12 @@ const Cart = ({ token = null }) => {
   }, [token]);
 
   const handleQuantityChange = async (item, quantity) => {
-    const id = item.id;
-    setPendingId(id);
+    setPendingId(item.id);
     try {
       if (quantity <= 0) {
-        await deleteCart(id);
+        await deleteCart(item.id);
       } else {
-        await updateCart(id, { quantity });
+        await updateCart(item.id, { quantity });
       }
       window.dispatchEvent(new Event("cart-updated"));
     } catch (error) {
@@ -61,11 +107,35 @@ const Cart = ({ token = null }) => {
     }
   };
 
-  const totalItems = items.reduce((sum, item) => sum + (item.quantity ?? 0), 0);
-  const totalPrice = items.reduce(
-    (sum, item) => sum + resolveItemPrice(item) * (item.quantity ?? 0),
-    0,
-  );
+  const cartItems = token ? items : [];
+  const totalItems = countItems(cartItems);
+  const totalPrice = calculateTotalPrice(cartItems);
+
+  const renderContent = () => {
+    if (!token) return <LoginPrompt />;
+    if (loading) return <CartSkeleton />;
+    if (error) {
+      return (
+        <div role="alert" className="alert alert-error">
+          <span>{error}</span>
+        </div>
+      );
+    }
+    if (cartItems.length === 0) return <EmptyCart />;
+
+    return (
+      <ul className="divide-y divide-base-300">
+        {cartItems.map((item) => (
+          <CartItem
+            key={getBookId(item)}
+            item={item}
+            onQuantityChange={handleQuantityChange}
+            pending={pendingId === item.id}
+          />
+        ))}
+      </ul>
+    );
+  };
 
   return (
     <div className="drawer-end w-fit">
@@ -104,61 +174,9 @@ const Cart = ({ token = null }) => {
             </label>
           </div>
 
-          <div className="grow overflow-y-auto p-4">
-            {!token ? (
-              <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
-                <p className="text-sm text-base-content/60">
-                  Login untuk melihat buku yang telah ditambahkan.
-                </p>
-                <Link to="/login" className="btn btn-primary btn-sm">
-                  Login
-                </Link>
-              </div>
-            ) : loading ? (
-              <ul className="flex flex-col gap-2">
-                {[0, 1, 2].map((i) => (
-                  <li key={i} className="flex items-start gap-3 py-3">
-                    <div className="skeleton h-24 w-16 shrink-0" />
-                    <div className="flex grow flex-col gap-2">
-                      <div className="skeleton h-4 w-3/4" />
-                      <div className="skeleton h-3 w-1/2" />
-                      <div className="skeleton h-4 w-1/3" />
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            ) : error ? (
-              <div role="alert" className="alert alert-error">
-                <span>{error}</span>
-              </div>
-            ) : items.length === 0 ? (
-              <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
-                <MdOutlineShoppingCart className="h-10 w-10" />
-                <p className="text-sm text-base-content/60">
-                  Belum ada buku di keranjang.
-                </p>
-                <label htmlFor="cart-drawer" className="btn btn-primary btn-sm">
-                  Tutup
-                </label>
-                <Link to="/books" className="btn btn-ghost btn-sm">
-                  Jelajahi Buku
-                </Link>
-              </div>
-            ) : (
-              <ul className="divide-y divide-base-300">
-                {items.map((item) => (
-                  <CartItem
-                    key={item.id ?? resolveBookId(item)}
-                    item={item}
-                    onQuantityChange={handleQuantityChange}
-                    pending={pendingId === item.id}
-                  />
-                ))}
-              </ul>
-            )}
-          </div>
+          <div className="grow overflow-y-auto p-4">{renderContent()}</div>
 
-          {token && items.length > 0 && (
+          {cartItems.length > 0 && (
             <div className="border-t border-base-300 p-4">
               <div className="mb-3 flex items-center justify-between text-sm">
                 <span className="text-base-content/60">

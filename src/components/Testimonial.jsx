@@ -76,15 +76,14 @@ const Testimonial = () => {
     >
       <div className="mx-auto max-w-6xl">
         <div className="max-w-2xl">
-          <span className="badge badge-outline badge-sm">Testimoni</span>
           <h2
             id="testimonials-title"
-            className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl"
+            className="text-2xl font-bold tracking-tight sm:text-3xl"
           >
             Apa kata pembaca
           </h2>
           <p className="mt-2 text-sm leading-relaxed text-base-content/70 sm:text-base">
-            Pengalaman pembaca yang menemukan buku favoritnya di Bookstore.
+            Catatan pembeli dari Jakarta sampai Makassar.
           </p>
         </div>
 
